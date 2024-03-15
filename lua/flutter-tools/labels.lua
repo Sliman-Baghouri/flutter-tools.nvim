@@ -40,16 +40,16 @@ function M.closing_tags(err, response, _)
     render_labels(response.labels, opts)
 end
 
+function M.clear_labels()
+    api.nvim_buf_clear_namespace(0, namespace, 0, -1)
+end
+
 -- Hook into the TextChanged events to clear closing tags after deletion
 api.nvim_exec([[
 augroup ClosingTagsClearance
   autocmd!
-  autocmd TextChanged,TextChangedI <buffer> lua require('flutter-tools.closing_labels').clear_labels()
+  autocmd TextChanged,TextChangedI <buffer> lua require('flutter-tools.labels').clear_labels()
 augroup END
 ]], false)
-
-function M.clear_labels()
-    api.nvim_buf_clear_namespace(0, namespace, 0, -1)
-end
 
 return M
