@@ -15,27 +15,19 @@ local function render_labels(labels, opts)
     local highlight = opts.highlight or "Comment"
     local prefix = opts.prefix or "// "
 
-    local buf_lines = api.nvim_buf_line_count(0)
-
     for _, item in ipairs(labels) do
         local line = item.range["end"].line
-        -- Ensure the line number is within the valid range of lines in the buffer
-        if line > 0 and line <= buf_lines then
-            local ok, err = pcall(api.nvim_buf_set_extmark, 0, namespace, line, -1, {
-                virt_text = {{
-                    prefix .. item.label,
-                    highlight,
-                }},
-                virt_text_pos = "eol",
-                hl_mode = "combine",
-            })
-            if not ok then
-                local name = api.nvim_buf_get_name(0)
-                ui.notify(fmt("Error drawing label for %s on line %d.\nBecause: %s", name, line, err), ui.ERROR)
-            end
-        else
-            -- Handle the case where the line number is out of range
-            ui.notify(fmt("Error: Line number %d is out of range.", line), ui.ERROR)
+        local ok, err = pcall(api.nvim_buf_set_extmark, 0, namespace, line, -1, {
+            virt_text = {{
+                prefix .. item.label,
+                highlight,
+            }},
+            virt_text_pos = "eol",
+            hl_mode = "combine",
+        })
+        if not ok then
+            local name = api.nvim_buf_get_name(0)
+            ui.notify(fmt("Error drawing label for %s on line %d.\nBecause: %s", name, line, err), ui.ERROR)
         end
     end
 end
@@ -47,6 +39,14 @@ function M.closing_tags(err, response, _)
     if uri ~= vim.uri_from_bufnr(0) then return end
     render_labels(response.labels, opts)
 end
+
+-- Hook into the TextChanged events to clear closing tags after deletion
+api.nvim_exec([[
+augroup ClosingTagsClearance
+  autocmd!
+  autocmd TextChanged,TextChangedI <buffer> lua require('flutter-tools.closing_labels').clear_labels()
+augroup END
+]], false)
 
 function M.clear_labels()
     api.nvim_buf_clear_namespace(0, namespace, 0, -1)
