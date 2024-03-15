@@ -15,19 +15,23 @@ local function render_labels(labels, opts)
     local highlight = opts.highlight or "Comment"
     local prefix = opts.prefix or "// "
 
+    local previous_line = -1
     for _, item in ipairs(labels) do
         local line = item.range["end"].line
-        local ok, err = pcall(api.nvim_buf_set_extmark, 0, namespace, line, -1, {
-            virt_text = {{
-                prefix .. item.label,
-                highlight,
-            }},
-            virt_text_pos = "eol",
-            hl_mode = "combine",
-        })
-        if not ok then
-            local name = api.nvim_buf_get_name(0)
-            ui.notify(fmt("Error drawing label for %s on line %d.\nBecause: %s", name, line, err), ui.ERROR)
+        -- Check if the label will overlap with the previous one
+        if line ~= previous_line then
+            local ok, _ = pcall(api.nvim_buf_set_extmark, 0, namespace, line, -1, {
+                virt_text = {{
+                    prefix .. item.label,
+                    highlight,
+                }},
+                virt_text_pos = "eol",
+                hl_mode = "combine",
+            })
+            -- Only update previous_line if setting extmark was successful
+            if ok then
+                previous_line = line
+            end
         end
     end
 end
@@ -37,19 +41,8 @@ function M.closing_tags(err, response, _)
     if err or not opts.enabled then return end
     local uri = response.uri
     if uri ~= vim.uri_from_bufnr(0) then return end
-    render_labels(response.labels, opts)
+    -- Use pcall to handle any potential errors silently
+    pcall(render_labels, response.labels, opts)
 end
-
-function M.clear_labels()
-    api.nvim_buf_clear_namespace(0, namespace, 0, -1)
-end
-
--- Hook into the TextChanged events to clear closing tags after deletion
-api.nvim_exec([[
-augroup ClosingTagsClearance
-  autocmd!
-  autocmd TextChanged,TextChangedI <buffer> lua require('flutter-tools.labels').clear_labels()
-augroup END
-]], false)
 
 return M
